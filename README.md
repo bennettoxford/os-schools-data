@@ -1,3 +1,9 @@
+# OpenSAFELY Schools Data
+
+This repo contains scripts for working with data for the [OpenSAFELY schools](https://schools.opensafely.org/) project.
+
+## `generate_synthetic_data.py`
+
 This script generates CSV files of synthetic data that can be used for developing research code at arm's length from real data.
 
 The data is based on our understanding of the data that will be available in TED, which is derived from exploring the data from one school that is currently available in TED.
@@ -15,4 +21,4 @@ These assumptions can be revisited if it turns out that the synthetic data needs
 
 A student's performance in an assessment is derived from their baseline score, modified by school-, class-, and teacher-level effects as well as their PP status and their attendance.
 
-Find the CSV files in the output/ directory.
+Find the CSV files in the synthetic-data/ directory.
