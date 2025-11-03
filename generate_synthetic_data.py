@@ -110,7 +110,7 @@ def generate_school_data(school_ix, results, students):
                     "assessment_type": "#AttendanceRR Half Term Snapshot",
                     "subject": "#AttendanceRR",
                     # Add a random fluctuation so that the two attendance records are different.
-                    "score": max(attendance + random.gauss(mu=0, sigma=5), 100),
+                    "score": min(attendance + random.gauss(mu=0, sigma=5), 100),
                 }
             )
 
