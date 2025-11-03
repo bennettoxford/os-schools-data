@@ -26,3 +26,9 @@ These assumptions can be revisited if it turns out that the synthetic data needs
 A student's performance in an assessment is derived from their baseline score, modified by school-, class-, and teacher-level effects as well as their PP status and their attendance.
 
 Find the CSV files in the synthetic-data/ directory.
+
+## `generate_report.py`
+
+This script generates a report about either the synthetic data (from `generate_synthetic_data.py`) or the real data (from the SQL scripts).
+
+Find reports for the synthetic and the real data in the reports/ directory.
