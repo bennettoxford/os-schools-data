@@ -64,13 +64,20 @@ def generate_school_data(school_ix, results, students):
         pp_effect = -5 if pp else 0
         attendance_effect = attendance - 100
 
+        if random.random() < 0.1:
+            ks2_maths_score = baseline + int(random.gauss(mu=0, sigma=5))
+            ks2_reading_score = baseline + int(random.gauss(mu=0, sigma=5))
+        else:
+            ks2_maths_score = ""
+            ks2_reading_score = ""
+
         students.append(
             {
                 "student_id": student_id,
                 "school_id": school_id,
                 "sex": sex,
-                "ks2_maths_score": baseline + int(random.gauss(mu=0, sigma=5)),
-                "ks2_reading_score": baseline + int(random.gauss(mu=0, sigma=5)),
+                "ks2_maths_score": ks2_maths_score,
+                "ks2_reading_score": ks2_reading_score,
                 "pp": "T" if pp else "F",
                 "eal": "T" if eal else "F",
                 "send": "T" if send else "F",
@@ -95,7 +102,7 @@ def generate_school_data(school_ix, results, students):
                     "date": "2025-08-05",
                     "assessment_type": "#AttendanceRR Cumulative YTD Snapshot",
                     "subject": "#AttendanceRR",
-                    "score": attendance,
+                    "score": f"{attendance:0.1f}",
                 }
             )
             results.append(
@@ -110,7 +117,7 @@ def generate_school_data(school_ix, results, students):
                     "assessment_type": "#AttendanceRR Half Term Snapshot",
                     "subject": "#AttendanceRR",
                     # Add a random fluctuation so that the two attendance records are different.
-                    "score": min(attendance + random.gauss(mu=0, sigma=5), 100),
+                    "score": f"{min(attendance + random.gauss(mu=0, sigma=5), 100):0.1f}",
                 }
             )
 
@@ -122,6 +129,13 @@ def generate_school_data(school_ix, results, students):
             if random.random() < 0.1:
                 # Not every student takes every subject.
                 continue
+
+            if year_group <= 9:
+                assessment_type = "* Current Grades (KS3)"
+            elif year_group <= 11:
+                assessment_type = "* Current Grades"
+            else:
+                assessment_type = "* Current Grades (KS5)"
 
             # Find a class and teacher for this year group and subject.
             cls = random.choice(classes[(year_group, subject)])
@@ -141,12 +155,12 @@ def generate_school_data(school_ix, results, students):
             results.append(
                 {
                     "student_id": student_id,
-                    "teacher_id": cls["teacher"]["id"],
-                    "class_id": cls["id"],
+                    "teacher_id": cls["teacher"]["id"] if not (cls["hide"] or cls["teacher"]["hide"]) else "",
+                    "class_id": cls["id"] if not cls["hide"] else "",
                     "year_group": f"Y{year_group}",
                     "academic_year": academic_year,
                     "date": date(2025, 1, 1) + timedelta(random.randint(0, 180)),
-                    "assessment_type": "*Current Grades",
+                    "assessment_type": assessment_type,
                     "subject": subject,
                     "score": score,
                 }
@@ -162,7 +176,11 @@ def build_classes(school_ix):
         teacher_id = f"TCH{school_ix:02}{teacher_ix:02}"
         subject = subjects[teacher_ix % len(subjects)]
         teachers[subject].append(
-            {"id": teacher_id, "effect": random.gauss(mu=0, sigma=5)}
+            {
+                "id": teacher_id,
+                "effect": random.gauss(mu=0, sigma=5),
+                "hide": random.random() < 0.2,
+            }
         )
 
     class_ix = 0
@@ -177,11 +195,13 @@ def build_classes(school_ix):
                         "id": class_id,
                         "effect": random.gauss(mu=0, sigma=20),
                         "teacher": teacher,
+                        "hide": random.random() < 0.2,
                     }
                 )
                 class_ix += 1
 
     return classes
+
 
 def convert_score(raw_score, year_group, is_nvq):
     """Convert a raw score (between 0 and 100) into a suitable grade."""
