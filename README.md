@@ -2,7 +2,7 @@
 
 This repo contains scripts for working with data for the [OpenSAFELY schools](https://schools.opensafely.org/) project.
 
-## `students.sql`, `results.sql`
+## `sql/students.sql`, `sql/results.sql`
 
 These SQL scripts extract data from the TED database in a structure that conforms to the [ehrQL schema for TED data](https://docs.google.com/document/d/1vxEM9V6J28TtwQwDGRG861ApW-D6RLT0rJs2OJ_NSh0).
 
