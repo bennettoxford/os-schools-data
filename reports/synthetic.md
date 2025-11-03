@@ -120,5 +120,5 @@ Generated on 2025-11-03.
 | #AttendanceRR Half Term Snapshot | Numeric (min: 71.6, max: 100.0) | 555 | 555 | 555 | Y7 (142); Y8 (146); Y9 (135); Y10 (132) | #AttendanceRR (555) |
 | * Current Grades | Unknown grading system | 1230 | 249 | 433 | Y10 (593); Y11 (637) | Construction (244); English (251); Hospitality (246); Mathematics (247); Science (242) |
 | * Current Grades (KS3) | Eg 8A+ (min: 7A, max: 9E) | 1142 | 185 | 238 | Y7 (383); Y8 (393); Y9 (366) | English (375); Mathematics (390); Science (377) |
-| * Current Grades (KS5) | Unknown grading system | 1613 | 517 | 716 | Y12 (742); Y13 (871) | Construction (325); English (318); Hospitality (320); Mathematics (326); Science (324) |
+| * Current Grades (KS5) | Letter grades with KS5 NVQ grades | 1613 | 517 | 716 | Y12 (742); Y13 (871) | Construction (325); English (318); Hospitality (320); Mathematics (326); Science (324) |
 
