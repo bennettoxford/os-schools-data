@@ -30,6 +30,8 @@ def main():
 
     write_student_section(input_dir)
     print()
+    write_teacher_section(input_dir)
+    print()
     write_results_section(input_dir)
 
 
@@ -94,6 +96,43 @@ def write_student_section(input_dir):
         for label, value in summarise_scores(rows, field):
             print(f"- {label}: {value}")
         print()
+
+
+def write_teacher_section(input_dir):
+    rows, fieldnames = load_csv(input_dir / "teachers.csv")
+
+    print("## Teachers")
+    print()
+
+    total_teachers = len(rows)
+    missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
+    missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_teachers)
+
+    print("### Dataset Summary")
+    print()
+    print(f"- Total teachers: {total_teachers}")
+
+    print(f"- Teachers with any missing values: {missing_rows_count} ({missing_rows_percentage})")
+    print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} teachers")
+    print()
+
+    print()
+    print("### Missing Data")
+    print()
+    print("| Field | Missing values | % of teachers |")
+    print("| --- | --- | --- |")
+    for field, missing, percentage in summarise_missing_data(rows, fieldnames):
+        print(f"| {field} | {missing} | {percentage} |")
+    print()
+
+    print("### Teacher Counts by Payscale")
+    print()
+    print("| Payscale | Teachers |")
+    print("| --- | --- |")
+    payscale_counter = Counter(row["payscale"] for row in rows)
+    for payscale, count in summarise_counter(payscale_counter):
+        print(f"| {payscale} | {count} |")
+    print()
 
 
 def write_results_section(input_dir):

@@ -18,6 +18,7 @@ num_students_per_year = 150
 nvq_subjects = ["Construction", "Hospitality"]
 non_nvq_subjects = ["English", "Mathematics", "Science"]
 subjects = nvq_subjects + non_nvq_subjects
+pay_grades = ["M1", "M2", "M3", "U1", "U2", "U3"]
 
 # The probabilities that a given student has given attributes.
 prob_pp = 0.15
@@ -31,20 +32,26 @@ academic_year = "2024/2025"
 
 
 def main(output_dir):
-    results = []
-    students = []
+    all_students = []
+    all_teachers = []
+    all_results = []
 
     for school_ix in range(num_schools):
-        generate_school_data(school_ix, results, students)
+        students, teachers, results = generate_school_data(school_ix)
+        all_students.extend(students)
+        all_teachers.extend(teachers)
+        all_results.extend(results)
 
-    write_output(output_dir, results, students)
+    write_output(output_dir, all_students, all_teachers, all_results)
 
 
-def generate_school_data(school_ix, results, students):
+def generate_school_data(school_ix):
     school_id = f"SCH{school_ix:02}"
     school_effect = random.gauss(mu=0, sigma=10)
 
-    classes = build_classes(school_ix)
+    students = []
+    results = []
+    classes, teachers = build_classes_and_teachers(school_ix)
 
     for student_id in range(num_students_per_year * 7):
         # Generate student attributes.
@@ -166,18 +173,30 @@ def generate_school_data(school_ix, results, students):
                 }
             )
 
+    return students, teachers, results
 
-def build_classes(school_ix):
-    """Return dictionary mapping (year_group, subject) pairs to class metadata."""
+
+def build_classes_and_teachers(school_ix):
+    """Return metadata about classes and teachers.
+
+    * classes is dictionary mapping (year_group, subject) pairs to class metadata
+    * teachers is a list of teacher metadata
+    """
     teachers = defaultdict(list)
     classes = defaultdict(list)
 
     for teacher_ix in range(num_teachers_per_school):
         teacher_id = f"TCH{school_ix:02}{teacher_ix:02}"
         subject = subjects[teacher_ix % len(subjects)]
+        payscale = random.choice(pay_grades) if random.random() < 0.5 else ""
+        specialism = f"Teacher of {subject}" if random.random() < 0.5 else ""
+        date_started_school = date(random.randint(2020, 2025), random.randint(1, 12), 1)
         teachers[subject].append(
             {
                 "id": teacher_id,
+                "payscale": payscale,
+                "specialism": specialism,
+                "date_started_school": date_started_school,
                 "effect": random.gauss(mu=0, sigma=5),
                 "hide": random.random() < 0.2,
             }
@@ -200,7 +219,18 @@ def build_classes(school_ix):
                 )
                 class_ix += 1
 
-    return classes
+    teachers = [
+        {
+            "id": t["id"],
+            "payscale": t["payscale"],
+            "specialism": t["specialism"],
+            "date_started_school": t["date_started_school"],
+        }
+        for lst in teachers.values()
+        for t in lst
+    ]
+
+    return classes, teachers
 
 
 def convert_score(raw_score, year_group, is_nvq):
@@ -229,16 +259,22 @@ def convert_score(raw_score, year_group, is_nvq):
     return scores[int(raw_score * len(scores))]
 
 
-def write_output(output_dir, results, students):
+def write_output(output_dir, students, teachers, results):
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    results_file = output_dir / "results.csv"
     students_file = output_dir / "students.csv"
+    teachers_file = output_dir / "teachers.csv"
+    results_file = output_dir / "results.csv"
 
     with open(students_file, "w") as f:
         writer = csv.DictWriter(f, students[0].keys())
         writer.writeheader()
         writer.writerows(students)
+
+    with open(teachers_file, "w") as f:
+        writer = csv.DictWriter(f, teachers[0].keys())
+        writer.writeheader()
+        writer.writerows(teachers)
 
     with open(results_file, "w") as f:
         writer = csv.DictWriter(f, results[0].keys())

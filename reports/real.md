@@ -1,6 +1,6 @@
 # TED Data Report: Real data
 
-Generated on 2025-11-03.
+Generated on 2025-11-04.
 
 ## Students
 
@@ -65,6 +65,60 @@ Generated on 2025-11-03.
 - Standard deviation: 8.4
 - 25th percentile: 100.0
 - 75th percentile: 112.0
+
+
+## Teachers
+
+### Dataset Summary
+
+- Total teachers: 366
+- Teachers with any missing values: 303 (82.8%)
+- Suppression threshold: 5 teachers
+
+
+### Missing Data
+
+| Field | Missing values | % of teachers |
+| --- | --- | --- |
+| teacher_id | 0 | 0.0% |
+| payscale | 124 | 33.9% |
+| specialism | 260 | 71.0% |
+| date_started_school | 0 | 0.0% |
+
+### Teacher Counts by Payscale
+
+| Payscale | Teachers |
+| --- | --- |
+|  | 124 |
+| L03 | <5 (suppressed) |
+| L05 | <5 (suppressed) |
+| L08 | <5 (suppressed) |
+| L11 | <5 (suppressed) |
+| M2 | <5 (suppressed) |
+| M3 | <5 (suppressed) |
+| M4 | <5 (suppressed) |
+| S1 | 21 |
+| S2 | 34 |
+| S3 | 9 |
+| S4 | 11 |
+| S5 | 16 |
+| S6 | 12 |
+| S7 | 5 |
+| TMS | 42 |
+| TS1 | <5 (suppressed) |
+| TS2 | <5 (suppressed) |
+| TS3 | <5 (suppressed) |
+| TS5 | <5 (suppressed) |
+| TS6 | <5 (suppressed) |
+| TS7 | <5 (suppressed) |
+| TUT | 46 |
+| U3 | <5 (suppressed) |
+| UQT1 | <5 (suppressed) |
+| UT1 | 10 |
+| UT2 | <5 (suppressed) |
+| UT3 | <5 (suppressed) |
+| UT4 | <5 (suppressed) |
+| UT6 | <5 (suppressed) |
 
 
 ## Results
