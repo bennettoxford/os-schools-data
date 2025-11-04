@@ -21,26 +21,21 @@ def main():
         print("Usage: python generate_report.py [path/to/data] [title]")
 
     input_dir = Path(sys.argv[1])
-    students_path = input_dir / "students.csv"
-    results_path = input_dir / "results.csv"
+    title = sys.argv[2]
 
-    student_rows, student_fields = load_csv(students_path)
-    results_rows, results_fields = load_csv(results_path)
-    generate_report(sys.argv[2], student_rows, student_fields, results_rows, results_fields)
-
-
-def generate_report(title, student_rows, student_fields, results_rows, results_fields):
     print(f"# TED Data Report: {title}")
     print()
     print(f"Generated on {date.today()}.")
     print()
 
-    write_student_section(student_rows, student_fields)
+    write_student_section(input_dir)
     print()
-    write_results_section(results_rows, results_fields)
+    write_results_section(input_dir)
 
 
-def write_student_section(rows, fieldnames):
+def write_student_section(input_dir):
+    rows, fieldnames = load_csv(input_dir / "students.csv")
+
     print("## Students")
     print()
 
@@ -101,7 +96,9 @@ def write_student_section(rows, fieldnames):
         print()
 
 
-def write_results_section(rows, fieldnames):
+def write_results_section(input_dir):
+    rows, fieldnames = load_csv(input_dir / "results.csv")
+
     print("## Results")
     print()
 
