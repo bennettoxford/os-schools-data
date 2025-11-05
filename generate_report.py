@@ -188,8 +188,8 @@ def write_results_section(input_dir):
     print("| year_group | Records |")
     print("| --- | --- |")
     year_group_counter = Counter(row["year_group"] for row in rows)
-    for year_group, count in summarise_counter(year_group_counter):
-        print(f"| {year_group} | {count} |")
+    for year_group, count in sorted(year_group_counter.items(), key=lambda item: year_group_sort_key(item[0])):
+        print(f"| {year_group} | {safe_count(count)} |")
     print()
 
     write_scores_summary(rows)
