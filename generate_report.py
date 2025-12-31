@@ -11,9 +11,11 @@ SUPPRESS_THRESHOLD = 5
 
 LETTER_GRADES = set("ABCDEU") | {"A*"}
 NUMBER_GRADES = {"1", "11", "2", "22", "3", "33", "4", "44", "5", "55", "6", "66", "7", "77", "8", "88", "9", "99", "U"}
-KS4_NVQ_GRADES = {"D1", "D2", "P1", "P2", "U"}
+KS4_NVQ_GRADES = {"D1", "D2", "M1", "M2", "P1", "P2", "U"}
 KS5_NVQ_GRADES = {"D*", "D*D*D*", "D*D*D", "D*DD", "DDD", "DDM", "MMM", "PPP", "U"}
+BTEC_GRADES = set("DMP")
 PLUS_MINUS_SCORES = {"--", "-", "=", "+", "++"}
+WORSE_SAME_BETTER = {"Worse", "Same", "Better"}
 
 
 def main():
@@ -295,8 +297,12 @@ def classify_score_type(rows):
 
     if all(re.fullmatch(r"\d[ABCDE]\+?", score) for score in scores):
         return f"Eg 8A+ (min: {min(scores)}, max: {max(scores)})"
+    if all(re.fullmatch(r"\d+:\d\d", score) for score in scores):
+        return "Reading ages (eg 12:04)"
     if scores <= LETTER_GRADES:
         return "Letter grades"
+    if scores <= BTEC_GRADES:
+        return "BTEC grades"
     if scores <= KS5_NVQ_GRADES:
         return "KS5 NVQ grades"
     if scores <= (LETTER_GRADES | KS5_NVQ_GRADES):
@@ -309,6 +315,10 @@ def classify_score_type(rows):
         return "Numeric grades with KS4 NVQ grades"
     if scores <= PLUS_MINUS_SCORES:
         return "One of: --, -, =, +, ++"
+    if scores <= WORSE_SAME_BETTER:
+        return "One of: Worse, Same, Better"
+    if scores == {"Y", "N"}:
+        return "One of: Y or No"
     if scores == {"F", "H"}:
         return "One of: F or H (Foundation or Higher)"
 
