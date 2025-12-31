@@ -328,6 +328,8 @@ def summarise_year_groups(rows):
 
 
 def year_group_sort_key(year_group):
+    if year_group == "R":
+        return 0
     match = re.search(r"\d+", year_group)
     return int(match.group())
 
