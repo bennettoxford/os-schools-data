@@ -375,7 +375,7 @@ def summarise_counter(counter):
 
 
 def parse_scores(rows, field):
-    return [int(row[field]) for row in rows if row[field]]
+    return [float(row[field]) for row in rows if row[field]]
 
 
 def format_detail_count(count):
