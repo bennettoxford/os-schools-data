@@ -42,6 +42,8 @@ WITH attainmentsWithRowNum AS (
         score,
         ROW_NUMBER() OVER (PARTITION BY attainmentKey ORDER BY classId ASC) AS rn
     FROM attainments
+    -- We need to filter out attainments with free text in the score field
+    WHERE len(score) <= 6
 ),
 dedupedAttainments AS (
     SELECT 
@@ -81,3 +83,5 @@ LEFT JOIN classes AS c
     ON c.classKey = at.classId
 LEFT JOIN classTeachers AS ct
     ON ct.classId = at.classId
+-- We want to filter out early years attainments
+WHERE a.cohort NOT LIKE 'E1%' AND a.cohort NOT LIKE 'N1%' AND a.cohort NOT LIKE 'N2%' AND a.cohort NOT LIKE '?%'
