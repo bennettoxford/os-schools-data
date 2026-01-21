@@ -9,6 +9,7 @@ from statistics import mean, median, stdev
 
 SUPPRESS_THRESHOLD = 5
 
+JUNIOR_GRADES = {"EM", "WBS", "WBS1", "WBS2", "WBS3", "WBS4", "WBS5", "WBS6", "WTS", "WTS+", "EXS", "GDS"}
 LETTER_GRADES = set("ABCDEU") | {"A*"}
 NUMBER_GRADES = {"1", "11", "2", "22", "3", "33", "4", "44", "5", "55", "6", "66", "7", "77", "8", "88", "9", "99", "U"}
 KS4_NVQ_GRADES = {"D1*", "D1", "D2", "M1", "M2", "P", "P1", "P2", "U"}
@@ -299,6 +300,8 @@ def classify_score_type(rows):
         return f"Eg 8A+ (min: {min(scores)}, max: {max(scores)})"
     if all(re.fullmatch(r"\d+:\d\d", score) for score in scores):
         return "Reading ages (eg 12:04)"
+    if scores <= JUNIOR_GRADES:
+        return "Junior grades"
     if scores <= LETTER_GRADES:
         return "Letter grades"
     if scores <= BTEC_GRADES:
