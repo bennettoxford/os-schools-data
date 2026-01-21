@@ -11,8 +11,8 @@ SUPPRESS_THRESHOLD = 5
 
 LETTER_GRADES = set("ABCDEU") | {"A*"}
 NUMBER_GRADES = {"1", "11", "2", "22", "3", "33", "4", "44", "5", "55", "6", "66", "7", "77", "8", "88", "9", "99", "U"}
-KS4_NVQ_GRADES = {"D1", "D2", "M1", "M2", "P1", "P2", "U"}
-KS5_NVQ_GRADES = {"D*", "D*D*D*", "D*D*D", "D*DD", "DDD", "DDM", "MMM", "PPP", "U"}
+KS4_NVQ_GRADES = {"D1*", "D1", "D2", "M1", "M2", "P", "P1", "P2", "U"}
+KS5_NVQ_GRADES = {"D*", "D*D*D*", "D*DD", "D*D*D", "D*DD", "DDD", "DDM", "DMM", "DMP", "DPP", "MMM", "MPP", "MMP", "PPP", "U"}
 BTEC_GRADES = set("DMP")
 PLUS_MINUS_SCORES = {"--", "-", "=", "+", "++"}
 WORSE_SAME_BETTER = {"Worse", "Same", "Better"}
