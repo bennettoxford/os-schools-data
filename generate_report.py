@@ -320,6 +320,8 @@ def classify_score_type(rows):
         return "One of: --, -, =, +, ++"
     if scores <= WORSE_SAME_BETTER:
         return "One of: Worse, Same, Better"
+    if scores <= {"EXP-", "EXP", "EXP+"}:
+        return "One of: EXP-, EXP, EXP+"
     if scores == {"Y", "N"}:
         return "One of: Y or No"
     if scores == {"F", "H"}:
