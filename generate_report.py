@@ -7,7 +7,8 @@ from datetime import date
 from pathlib import Path
 from statistics import mean, median, stdev
 
-SUPPRESS_THRESHOLD = 5
+SUPPRESS_THRESHOLD = 7
+ROUND_BASE = 5
 
 JUNIOR_GRADES = {"EM", "WBS", "WBS1", "WBS2", "WBS3", "WBS4", "WBS5", "WBS6", "WTS", "WTS+", "EXS", "GDS"}
 LETTER_GRADES = set("ABCDEU") | {"A*"}
@@ -50,16 +51,17 @@ def write_student_section(input_dir):
 
     print("### Dataset Summary")
     print()
-    print(f"- Total students: {total_students}")
+    print(f"- Total students: {safe_count(total_students)}")
 
     print(f"- Students with any missing values: {missing_rows_count} ({missing_rows_percentage})")
     print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} students")
+    print(f"- Counts rounded to nearest {ROUND_BASE}")
     print()
 
     print()
     print("### Missing Data")
     print()
-    print("| Field | Missing values | % of students |")
+    print("| Field | Missing values (rounded) | % of students |")
     print("| --- | --- | --- |")
     for field, missing, percentage in summarise_missing_data(rows, fieldnames):
         print(f"| {field} | {missing} | {percentage} |")
@@ -67,7 +69,7 @@ def write_student_section(input_dir):
 
     print("### Student Counts by School")
     print()
-    print("| School | Students |")
+    print("| School | Students (rounded) |")
     print("| --- | --- |")
     school_counter = Counter(row["school_id"] for row in rows)
     for school, count in summarise_counter(school_counter):
@@ -76,7 +78,7 @@ def write_student_section(input_dir):
 
     print("### Student Counts by Sex")
     print()
-    print("| Sex | Students |")
+    print("| Sex | Students (rounded) |")
     print("| --- | --- |")
     sex_counter = Counter(row["sex"] for row in rows)
     for sex, count in summarise_counter(sex_counter):
@@ -85,7 +87,7 @@ def write_student_section(input_dir):
 
     print("### Support And Funding Indicators")
     print()
-    print("| Field | Yes | No | Other |")
+    print("| Field | Yes (rounded) | No (rounded) | Other (rounded) |")
     print("| --- | --- | --- | --- |")
     for field in ("pp", "eal", "send", "ehcp", "lac"):
         yes, no, other = summarise_boolean_field(rows, field)
@@ -113,16 +115,17 @@ def write_teacher_section(input_dir):
 
     print("### Dataset Summary")
     print()
-    print(f"- Total teachers: {total_teachers}")
+    print(f"- Total teachers: {safe_count(total_teachers)}")
 
     print(f"- Teachers with any missing values: {missing_rows_count} ({missing_rows_percentage})")
     print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} teachers")
+    print(f"- Counts rounded to nearest {ROUND_BASE}")
     print()
 
     print()
     print("### Missing Data")
     print()
-    print("| Field | Missing values | % of teachers |")
+    print("| Field | Missing values (rounded) | % of teachers |")
     print("| --- | --- | --- |")
     for field, missing, percentage in summarise_missing_data(rows, fieldnames):
         print(f"| {field} | {missing} | {percentage} |")
@@ -130,7 +133,7 @@ def write_teacher_section(input_dir):
 
     print("### Teacher Counts by Payscale")
     print()
-    print("| Payscale | Teachers |")
+    print("| Payscale | Teachers (rounded) |")
     print("| --- | --- |")
     payscale_counter = Counter(row["payscale"] for row in rows)
     for payscale, count in summarise_counter(payscale_counter):
@@ -160,7 +163,7 @@ def write_results_section(input_dir):
 
     print("### Dataset Summary")
     print()
-    print(f"- Total records: {total_records}")
+    print(f"- Total records: {safe_count(total_records)}")
     print(f"- Students represented: {safe_count(len(student_ids))}")
     print(f"- Teachers represented: {safe_count(len(teacher_ids))}")
     print(f"- Classes represented: {safe_count(len(class_ids))}")
@@ -168,11 +171,12 @@ def write_results_section(input_dir):
     print(f"- Latest assessment date: {latest_date}")
     print(f"- Records with any missing values: {missing_count_display} ({missing_percentage_display})")
     print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} records")
+    print(f"- Counts rounded to nearest {ROUND_BASE}")
     print()
 
     print("### Missing Data")
     print()
-    print("| Field | Missing values | % of records |")
+    print("| Field | Missing values (rounded) | % of records |")
     print("| --- | --- | --- |")
     for field, missing, percentage in summarise_missing_data(rows, fieldnames):
         print(f"| {field} | {missing} | {percentage} |")
@@ -180,7 +184,7 @@ def write_results_section(input_dir):
 
     print("### Academic Years")
     print()
-    print("| academic_year | Records |")
+    print("| academic_year | Records (rounded) |")
     print("| --- | --- |")
     academic_year_counter = Counter(row["academic_year"] for row in rows)
     for academic_year, count in summarise_counter(academic_year_counter):
@@ -188,7 +192,7 @@ def write_results_section(input_dir):
 
     print("### Year Groups")
     print()
-    print("| year_group | Records |")
+    print("| year_group | Records (rounded) |")
     print("| --- | --- |")
     year_group_counter = Counter(row["year_group"] for row in rows)
     for year_group, count in sorted(year_group_counter.items(), key=lambda item: year_group_sort_key(item[0])):
@@ -216,7 +220,7 @@ def summarise_scores(rows, field):
     sorted_scores = sorted(scores)
     metrics = []
 
-    metrics.append(("Count", str(len(scores))))
+    metrics.append(("Count", safe_count(len(scores))))
     metrics.append(("Mean", format_float(mean(scores))))
     metrics.append(("Median", format_float(median(scores))))
 
@@ -269,7 +273,7 @@ def write_scores_summary(rows):
     print("### Scores")
     print()
 
-    print("| Assessment type | Score type | Records | No class | No teacher | Year groups | Subjects |")
+    print("| Assessment type | Score type | Records (rounded) | No class (rounded) | No teacher (rounded) | Year groups (rounded) | Subjects (rounded) |")
     print("| --- | --- | --- | --- | --- | --- | --- |")
 
     grouped_rows = defaultdict(list)
@@ -362,7 +366,7 @@ def safe_count(count):
         return "0"
     elif count < SUPPRESS_THRESHOLD:
         return f"<{SUPPRESS_THRESHOLD} (suppressed)"
-    return str(count)
+    return str(round_count(count))
 
 
 def format_percentage(count, total):
@@ -395,8 +399,12 @@ def parse_scores(rows, field):
 
 def format_detail_count(count):
     if count > SUPPRESS_THRESHOLD:
-        return str(count)
+        return str(round_count(count))
     return "-"
+
+
+def round_count(count):
+    return int(ROUND_BASE * round(count / ROUND_BASE))
 
 
 def load_csv(path):
