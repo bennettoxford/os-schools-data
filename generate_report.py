@@ -9,6 +9,7 @@ from statistics import mean, median, stdev
 
 SUPPRESS_THRESHOLD = 7
 ROUND_BASE = 5
+SCHOOL_FIELD = "school_id"
 
 JUNIOR_GRADES = {"EM", "WBS", "WBS1", "WBS2", "WBS3", "WBS4", "WBS5", "WBS6", "WTS", "WTS+", "EXS", "GDS"}
 LETTER_GRADES = set("ABCDEU") | {"A*"}
@@ -23,6 +24,7 @@ WORSE_SAME_BETTER = {"Worse", "Same", "Better"}
 def main():
     if len(sys.argv) != 3:
         print("Usage: python generate_report.py [path/to/data] [title]")
+        return
 
     input_dir = Path(sys.argv[1])
     title = sys.argv[2]
@@ -32,24 +34,63 @@ def main():
     print(f"Generated on {date.today()}.")
     print()
 
-    write_student_section(input_dir)
+    students_rows, students_fieldnames = load_csv(input_dir / "students.csv")
+    teachers_rows, teachers_fieldnames = load_csv(input_dir / "teachers.csv")
+    results_rows, results_fieldnames = load_csv(input_dir / "results.csv")
+
+    write_student_section(students_rows, students_fieldnames, base_level=2, include_school_counts=True)
     print()
-    write_teacher_section(input_dir)
+    write_teacher_section(teachers_rows, teachers_fieldnames, base_level=2)
     print()
-    write_results_section(input_dir)
+    write_results_section(results_rows, results_fieldnames, base_level=2)
+
+    student_school_field = SCHOOL_FIELD
+    teacher_school_field = SCHOOL_FIELD
+    results_school_field = SCHOOL_FIELD
+    if student_school_field not in students_fieldnames:
+        raise ValueError("students.csv must include a school_id column for per-school reporting.")
+    if teacher_school_field not in teachers_fieldnames:
+        raise ValueError("teachers.csv must include a school_id column for per-school reporting.")
+    if results_school_field not in results_fieldnames:
+        raise ValueError("results.csv must include a school_id column for per-school reporting.")
+
+    schools = []
+    if student_school_field:
+        schools = sorted({row[student_school_field] for row in students_rows if row.get(student_school_field)})
+
+    if not schools:
+        return
+
+    print()
+
+    for school in schools:
+        print()
+        heading(2, f"School: {school}")
+        print()
+        if student_school_field:
+            school_students = [row for row in students_rows if row.get(student_school_field) == school]
+            write_student_section(school_students, students_fieldnames, base_level=3, include_school_counts=False)
+            print()
+        school_teachers = [row for row in teachers_rows if row.get(teacher_school_field) == school]
+        write_teacher_section(school_teachers, teachers_fieldnames, base_level=3)
+        print()
+        school_results = [row for row in results_rows if row.get(results_school_field) == school]
+        write_results_section(school_results, results_fieldnames, base_level=3)
 
 
-def write_student_section(input_dir):
-    rows, fieldnames = load_csv(input_dir / "students.csv")
+def heading(level, text):
+    print(f"{'#' * level} {text}")
 
-    print("## Students")
+
+def write_student_section(rows, fieldnames, base_level=2, include_school_counts=True):
+    heading(base_level, "Students")
     print()
 
     total_students = len(rows)
     missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
     missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_students)
 
-    print("### Dataset Summary")
+    heading(base_level + 1, "Dataset Summary")
     print()
     print(f"- Total students: {safe_count(total_students)}")
 
@@ -59,7 +100,7 @@ def write_student_section(input_dir):
     print()
 
     print()
-    print("### Missing Data")
+    heading(base_level + 1, "Missing Data")
     print()
     print("| Field | Missing values (rounded) | % of students |")
     print("| --- | --- | --- |")
@@ -67,16 +108,19 @@ def write_student_section(input_dir):
         print(f"| {field} | {missing} | {percentage} |")
     print()
 
-    print("### Student Counts by School")
-    print()
-    print("| School | Students (rounded) |")
-    print("| --- | --- |")
-    school_counter = Counter(row["school_id"] for row in rows)
-    for school, count in summarise_counter(school_counter):
-        print(f"| {school} | {count} |")
-    print()
+    if include_school_counts:
+        heading(base_level + 1, "Student Counts by School")
+        print()
+        if SCHOOL_FIELD not in fieldnames:
+            raise ValueError("students.csv must include a school_id column for per-school reporting.")
+        print("| School | Students (rounded) |")
+        print("| --- | --- |")
+        school_counter = Counter(row[SCHOOL_FIELD] for row in rows)
+        for school, count in summarise_counter(school_counter):
+            print(f"| {school} | {count} |")
+        print()
 
-    print("### Student Counts by Sex")
+    heading(base_level + 1, "Student Counts by Sex")
     print()
     print("| Sex | Students (rounded) |")
     print("| --- | --- |")
@@ -85,7 +129,7 @@ def write_student_section(input_dir):
         print(f"| {sex} | {count} |")
     print()
 
-    print("### Support And Funding Indicators")
+    heading(base_level + 1, "Support And Funding Indicators")
     print()
     print("| Field | Yes (rounded) | No (rounded) | Other (rounded) |")
     print("| --- | --- | --- | --- |")
@@ -94,26 +138,24 @@ def write_student_section(input_dir):
         print(f"| {field} | {yes} | {no} | {other} |")
     print()
 
-    print("### Key Stage 2 Score Summary")
+    heading(base_level + 1, "Key Stage 2 Score Summary")
     print()
     for field in ["ks2_maths_score", "ks2_reading_score"]:
-        print(f"#### {field}")
+        heading(base_level + 2, field)
         for label, value in summarise_scores(rows, field):
             print(f"- {label}: {value}")
         print()
 
 
-def write_teacher_section(input_dir):
-    rows, fieldnames = load_csv(input_dir / "teachers.csv")
-
-    print("## Teachers")
+def write_teacher_section(rows, fieldnames, base_level=2):
+    heading(base_level, "Teachers")
     print()
 
     total_teachers = len(rows)
     missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
     missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_teachers)
 
-    print("### Dataset Summary")
+    heading(base_level + 1, "Dataset Summary")
     print()
     print(f"- Total teachers: {safe_count(total_teachers)}")
 
@@ -123,7 +165,7 @@ def write_teacher_section(input_dir):
     print()
 
     print()
-    print("### Missing Data")
+    heading(base_level + 1, "Missing Data")
     print()
     print("| Field | Missing values (rounded) | % of teachers |")
     print("| --- | --- | --- |")
@@ -131,7 +173,7 @@ def write_teacher_section(input_dir):
         print(f"| {field} | {missing} | {percentage} |")
     print()
 
-    print("### Teacher Counts by Payscale")
+    heading(base_level + 1, "Teacher Counts by Payscale")
     print()
     print("| Payscale | Teachers (rounded) |")
     print("| --- | --- |")
@@ -141,10 +183,8 @@ def write_teacher_section(input_dir):
     print()
 
 
-def write_results_section(input_dir):
-    rows, fieldnames = load_csv(input_dir / "results.csv")
-
-    print("## Results")
+def write_results_section(rows, fieldnames, base_level=2):
+    heading(base_level, "Results")
     print()
 
     total_records = len(rows)
@@ -161,7 +201,7 @@ def write_results_section(input_dir):
     missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
     missing_count_display, missing_percentage_display = format_count_and_percentage(missing_rows, total_records)
 
-    print("### Dataset Summary")
+    heading(base_level + 1, "Dataset Summary")
     print()
     print(f"- Total records: {safe_count(total_records)}")
     print(f"- Students represented: {safe_count(len(student_ids))}")
@@ -174,7 +214,7 @@ def write_results_section(input_dir):
     print(f"- Counts rounded to nearest {ROUND_BASE}")
     print()
 
-    print("### Missing Data")
+    heading(base_level + 1, "Missing Data")
     print()
     print("| Field | Missing values (rounded) | % of records |")
     print("| --- | --- | --- |")
@@ -182,7 +222,7 @@ def write_results_section(input_dir):
         print(f"| {field} | {missing} | {percentage} |")
     print()
 
-    print("### Academic Years")
+    heading(base_level + 1, "Academic Years")
     print()
     print("| academic_year | Records (rounded) |")
     print("| --- | --- |")
@@ -190,7 +230,7 @@ def write_results_section(input_dir):
     for academic_year, count in summarise_counter(academic_year_counter):
         print(f"| {academic_year} | {count} |")
 
-    print("### Year Groups")
+    heading(base_level + 1, "Year Groups")
     print()
     print("| year_group | Records (rounded) |")
     print("| --- | --- |")
@@ -199,7 +239,7 @@ def write_results_section(input_dir):
         print(f"| {year_group} | {safe_count(count)} |")
     print()
 
-    write_scores_summary(rows)
+    write_scores_summary(rows, base_level=base_level + 1)
 
 
 def summarise_missing_data(rows, fieldnames):
@@ -269,8 +309,8 @@ def summarise_boolean_field(rows, field):
     return yes_display, no_display, "0"
 
 
-def write_scores_summary(rows):
-    print("### Scores")
+def write_scores_summary(rows, base_level=3):
+    heading(base_level, "Scores")
     print()
 
     print("| Assessment type | Score type | Records (rounded) | No class (rounded) | No teacher (rounded) | Year groups (rounded) | Subjects (rounded) |")
