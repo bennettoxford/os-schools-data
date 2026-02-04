@@ -12,8 +12,8 @@ from pathlib import Path
 random.seed(12345)
 
 # Various parameters indicating the number of schools/teachers/students and the available subjects.
-num_schools = 1
-num_teachers_per_school = 20
+num_schools = 5
+num_teachers_per_school = 40
 num_students_per_year = 150
 nvq_subjects = ["Construction", "Hospitality"]
 non_nvq_subjects = ["English", "Mathematics", "Science"]
@@ -37,7 +37,8 @@ def main(output_dir):
     all_results = []
 
     for school_ix in range(num_schools):
-        students, teachers, results = generate_school_data(school_ix)
+        school_id = school_id_for(school_ix)
+        students, teachers, results = generate_school_data(school_ix, school_id)
         all_students.extend(students)
         all_teachers.extend(teachers)
         all_results.extend(results)
@@ -45,8 +46,11 @@ def main(output_dir):
     write_output(output_dir, all_students, all_teachers, all_results)
 
 
-def generate_school_data(school_ix):
-    school_id = f"SCH{school_ix:02}"
+def school_id_for(school_ix):
+    return f"SCH{school_ix:02}"
+
+
+def generate_school_data(school_ix, school_id):
     school_effect = random.gauss(mu=0, sigma=10)
 
     students = []
@@ -101,6 +105,7 @@ def generate_school_data(school_ix):
             results.append(
                 {
                     "student_id": student_id,
+                    "school_id": school_id,
                     "teacher_id": None,
                     "class_id": None,
                     "year_group": f"Y{year_group}",
@@ -115,6 +120,7 @@ def generate_school_data(school_ix):
             results.append(
                 {
                     "student_id": student_id,
+                    "school_id": school_id,
                     "teacher_id": None,
                     "class_id": None,
                     "year_group": f"Y{year_group}",
@@ -162,6 +168,7 @@ def generate_school_data(school_ix):
             results.append(
                 {
                     "student_id": student_id,
+                    "school_id": school_id,
                     "teacher_id": cls["teacher"]["id"] if not (cls["hide"] or cls["teacher"]["hide"]) else "",
                     "class_id": cls["id"] if not cls["hide"] else "",
                     "year_group": f"Y{year_group}",
@@ -182,6 +189,7 @@ def build_classes_and_teachers(school_ix):
     * classes is dictionary mapping (year_group, subject) pairs to class metadata
     * teachers is a list of teacher metadata
     """
+    school_id = school_id_for(school_ix)
     teachers = defaultdict(list)
     classes = defaultdict(list)
 
@@ -194,6 +202,7 @@ def build_classes_and_teachers(school_ix):
         teachers[subject].append(
             {
                 "id": teacher_id,
+                "school_id": school_id,
                 "payscale": payscale,
                 "specialism": specialism,
                 "date_started_school": date_started_school,
@@ -222,6 +231,7 @@ def build_classes_and_teachers(school_ix):
     teachers = [
         {
             "id": t["id"],
+            "school_id": t["school_id"],
             "payscale": t["payscale"],
             "specialism": t["specialism"],
             "date_started_school": t["date_started_school"],
