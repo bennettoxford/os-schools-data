@@ -12,6 +12,7 @@ An attainment is a record that student X sat assessment Y as part of class Z on 
 We want to generate a table with one row per attainment and the following columns:
 
 * student_id
+* school_id
 * class_id
 * teacher_id
 * year_group
@@ -29,6 +30,8 @@ There are a few wrinkles:
     When this happens, we set teacher_id to NULL.
 * Some attainments cannot be linked to classes.
     As such, we use a LEFT JOIN from attainments to classes.
+* Because of above, we don't always have a class.schoolId.
+    So we join to student and fall back to the student's schoolId in that case.
 */
 
 
@@ -68,6 +71,8 @@ classTeachers AS (
 )
 SELECT
     at.studentId AS student_id,
+    -- fallback to student.schoolId if there was no class for this attainment
+    COALESCE(c.schoolId, s.schoolId) AS school_id,
     at.classId AS class_id,
     ct.teacherId AS teacher_id,
     LEFT(a.cohort, CHARINDEX(' ', a.cohort) - 1) AS year_group,
@@ -83,5 +88,7 @@ LEFT JOIN classes AS c
     ON c.classKey = at.classId
 LEFT JOIN classTeachers AS ct
     ON ct.classId = at.classId
+LEFT JOIN students AS s
+    ON s.studentKey = at.studentId
 -- We want to filter out early years attainments
 WHERE a.cohort NOT LIKE 'E1%' AND a.cohort NOT LIKE 'N1%' AND a.cohort NOT LIKE 'N2%' AND a.cohort NOT LIKE '?%'
