@@ -1,7 +1,7 @@
 set dotenv-load := true
 
 # extract specific sql into csv, e.g. just extract students
-extract name:
+extract name: _vm_only
     #!/bin/bash
     set -euo pipefail
     test -f "sql/{{name }}.sql"
@@ -15,3 +15,15 @@ extract-all: (extract "teachers") (extract "students") (extract "results")
 # run the mssql shell
 mssql:
     uv run mssql-cli.py
+
+# generate sythentic data
+synthetic-data dir="synthetic-data":
+    uv run generate_synthetic_data.py "{{ dir }}"
+
+# generate report on synthetic data
+report-synthetic:
+    uv run generate_report.py synthetic-data "Synthetic Data" > reports/synthetic.md
+
+# generate report on synthetic data - must provide data dir
+report-real:
+    uv run generate_report.py $DATA_DIR "Real Data" > reports/real.md
