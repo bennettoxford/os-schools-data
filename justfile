@@ -24,6 +24,6 @@ synthetic-data dir="synthetic-data":
 report-synthetic:
     uv run generate_report.py synthetic-data "Synthetic Data" > reports/synthetic.md
 
-# generate report on synthetic data - must provide data dir
+# generate report on real data in Level 4 dir.
 report-real:
-    uv run generate_report.py $DATA_DIR "Real Data" > reports/real.md
+    uv run generate_report.py $DATA_DIR "Real Data" > $LEVEL4_DIR/real.md

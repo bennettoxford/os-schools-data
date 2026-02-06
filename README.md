@@ -2,11 +2,21 @@
 
 This repo contains scripts for working with data for the [OpenSAFELY schools](https://schools.opensafely.org/) project.
 
+Commands can be run using the justfile: see `just --list` for available options.
+
 ## `sql/students.sql`, `sql/teachers.sql`, `sql/results.sql`
 
 These SQL scripts extract data from the TED database in a structure that conforms to the [ehrQL schema for TED data](https://docs.google.com/document/d/1vxEM9V6J28TtwQwDGRG861ApW-D6RLT0rJs2OJ_NSh0).
 
+You can run these from from the secure environment:
+
+1) ensure you have a .env with credentials
+2) `just extract $NAME` or `just extract-all`
+
+
 ## `generate_synthetic_data.py`
+
+`just synthetic-data`
 
 This script generates CSV files of synthetic data that can be used for developing research code at arm's length from real data.
 
@@ -28,6 +38,8 @@ A student's performance in an assessment is derived from their baseline score, m
 Find the CSV files in the synthetic-data/ directory.
 
 ## `generate_report.py`
+
+`just report-synthetic`
 
 This script generates a report about either the synthetic data (from `generate_synthetic_data.py`) or the real data (from the SQL scripts).
 
