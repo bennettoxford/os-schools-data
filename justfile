@@ -23,7 +23,9 @@ synthetic-data dir="synthetic-data":
 # generate report on synthetic data
 report-synthetic:
     uv run generate_report.py synthetic-data "Synthetic Data" > reports/synthetic.md
+    uvx ghmd --embed-css reports/synthetic.md
 
 # generate report on real data in Level 4 dir.
 report-real:
     uv run generate_report.py $DATA_DIR "Real Data" > $LEVEL4_DIR/real.md
+    uvx ghmd --embed-css $LEVEL4_DIR/real.md
