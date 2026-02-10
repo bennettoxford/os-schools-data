@@ -1,7 +1,7 @@
 set dotenv-load := true
 
 # extract specific sql into csv, e.g. just extract students
-extract name: _vm_only
+extract name:
     #!/bin/bash
     set -euo pipefail
     test -f "sql/{{name }}.sql"
