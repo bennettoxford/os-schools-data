@@ -68,6 +68,16 @@ classTeachers AS (
         END AS teacherId
     FROM teacherClassAllocations AS tca
     GROUP BY tca.classId
+),
+redactedAssessments AS (
+    SELECT
+        a.assessmentKey,
+        a.cohort,
+        a.subject,
+        -- Add more nested REPLACE(...) calls here as additional redaction rules are needed.
+        -- "star" is the name of one of MATs. These leak into assesment type values.
+        REPLACE(a.assessmentType COLLATE Latin1_General_CI_AS, 'star ', ' ') AS assessmentType
+    FROM assessments AS a
 )
 SELECT
     at.studentId AS student_id,
@@ -82,7 +92,7 @@ SELECT
     a.subject AS subject,
     at.score
 FROM dedupedAttainments AS at
-JOIN assessments AS a
+JOIN redactedAssessments AS a
     ON a.assessmentKey = at.assessmentId
 LEFT JOIN classes AS c
     ON c.classKey = at.classId
