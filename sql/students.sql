@@ -1,3 +1,5 @@
+-- ignore me: PatientsWithTypeOneDissent AllowedPatientsWithTypeOneDissent
+
 SELECT
     studentKey AS student_id,
     schoolId AS school_id,

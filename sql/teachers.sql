@@ -1,3 +1,4 @@
+-- ignore me: PatientsWithTypeOneDissent AllowedPatientsWithTypeOneDissent
 /*
 The teachers table contains duplicates, with one row per (teacherKey, specialism).
 Apart from specialism, all values for a given teacherKey are the same.

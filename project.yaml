@@ -1,0 +1,43 @@
+version: '4.0'
+
+actions:
+  generate_students:
+    run: >
+      sqlrunner:v1 sql/students.sql
+      --output output/students.csv 
+      --log-file outputs/students.log.json
+      --dummy-data-file synthetic-data/students.csv
+    outputs:
+      highly_sensitive:
+        students: output/students.csv
+
+  generate_teachers:
+    run: >
+      sqlrunner:v1 sql/teachers.sql
+      --output output/teachers.csv
+      --log-file outputs/teachers.log.json
+      --dummy-data-file synthetic-data/teachers.csv
+    outputs:
+      highly_sensitive:
+        teachers: output/teachers.csv
+
+  generate_results:
+    run: >
+      sqlrunner:v1 sql/results.sql
+      --output output/results.csv
+      --log-file outputs/results.log.json
+      --dummy-data-file synthetic-data/results.csv
+    outputs:
+      highly_sensitive:
+        students: output/results.csv
+
+  generate_user_report:
+    needs: [generate_students, generate_teachers, generate_results]
+    run: python:v2 generate_report.py output/ "User Data Report" --output output/report.md
+    outputs:
+      highly_sensitive:
+        students: output/report.md
+
+
+
+
