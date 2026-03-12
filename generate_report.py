@@ -1,7 +1,7 @@
+import argparse
 import csv
 import math
 import re
-import sys
 from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
@@ -21,13 +21,18 @@ PLUS_MINUS_SCORES = {"--", "-", "=", "+", "++"}
 WORSE_SAME_BETTER = {"Worse", "Same", "Better"}
 
 
-def main():
-    if len(sys.argv) != 3:
-        print("Usage: python generate_report.py [path/to/data] [title]")
-        return
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Generate a markdown data report from CSV files.")
+    parser.add_argument("input_dir", type=Path, help="Directory containing students.csv, teachers.csv, and results.csv.")
+    parser.add_argument("title", help="Report title.")
+    return parser.parse_args(argv)
 
-    input_dir = Path(sys.argv[1])
-    title = sys.argv[2]
+
+def main(argv=None):
+    args = parse_args(argv)
+
+    input_dir = args.input_dir
+    title = args.title
 
     print(f"# TED Data Report: {title}")
     print()
