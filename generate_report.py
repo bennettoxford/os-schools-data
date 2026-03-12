@@ -2,6 +2,7 @@ import argparse
 import csv
 import math
 import re
+import sys
 from collections import Counter, defaultdict
 from datetime import date
 from pathlib import Path
@@ -19,34 +20,57 @@ KS5_NVQ_GRADES = {"D*", "D*D*D*", "D*DD", "D*D*D", "D*DD", "DDD", "DDM", "DMM", 
 BTEC_GRADES = set("DMP")
 PLUS_MINUS_SCORES = {"--", "-", "=", "+", "++"}
 WORSE_SAME_BETTER = {"Worse", "Same", "Better"}
+OUTPUT_STREAM = sys.stdout
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Generate a markdown data report from CSV files.")
     parser.add_argument("input_dir", type=Path, help="Directory containing students.csv, teachers.csv, and results.csv.")
     parser.add_argument("title", help="Report title.")
+    parser.add_argument(
+        "--output",
+        type=argparse.FileType("w", encoding="utf-8"),
+        default=sys.stdout,
+        help="Write report to file instead of stdout.",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv=None):
+    global OUTPUT_STREAM
     args = parse_args(argv)
 
     input_dir = args.input_dir
     title = args.title
+    OUTPUT_STREAM = args.output
 
-    print(f"# TED Data Report: {title}")
-    print()
-    print(f"Generated on {date.today()}.")
-    print()
+    try:
+        run_report(input_dir, title)
+    finally:
+        if args.output is not sys.stdout:
+            args.output.close()
+
+
+def emit(*args, **kwargs):
+    kwargs.setdefault("file", OUTPUT_STREAM)
+    print(*args, **kwargs)
+
+
+def run_report(input_dir, title):
+
+    emit(f"# TED Data Report: {title}")
+    emit()
+    emit(f"Generated on {date.today()}.")
+    emit()
 
     students_rows, students_fieldnames = load_csv(input_dir / "students.csv")
     teachers_rows, teachers_fieldnames = load_csv(input_dir / "teachers.csv")
     results_rows, results_fieldnames = load_csv(input_dir / "results.csv")
 
     write_student_section(students_rows, students_fieldnames, base_level=2, include_school_counts=True)
-    print()
+    emit()
     write_teacher_section(teachers_rows, teachers_fieldnames, base_level=2)
-    print()
+    emit()
     write_results_section(results_rows, results_fieldnames, base_level=2)
 
     student_school_field = SCHOOL_FIELD
@@ -66,131 +90,131 @@ def main(argv=None):
     if not schools:
         return
 
-    print()
+    emit()
 
     for school in schools:
-        print()
+        emit()
         heading(2, f"School: {school}")
-        print()
+        emit()
         if student_school_field:
             school_students = [row for row in students_rows if row.get(student_school_field) == school]
             write_student_section(school_students, students_fieldnames, base_level=3, include_school_counts=False)
-            print()
+            emit()
         school_teachers = [row for row in teachers_rows if row.get(teacher_school_field) == school]
         write_teacher_section(school_teachers, teachers_fieldnames, base_level=3)
-        print()
+        emit()
         school_results = [row for row in results_rows if row.get(results_school_field) == school]
         write_results_section(school_results, results_fieldnames, base_level=3)
 
 
 def heading(level, text):
-    print(f"{'#' * level} {text}")
+    emit(f"{'#' * level} {text}")
 
 
 def write_student_section(rows, fieldnames, base_level=2, include_school_counts=True):
     heading(base_level, "Students")
-    print()
+    emit()
 
     total_students = len(rows)
     missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
     missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_students)
 
     heading(base_level + 1, "Dataset Summary")
-    print()
-    print(f"- Total students: {safe_count(total_students)}")
+    emit()
+    emit(f"- Total students: {safe_count(total_students)}")
 
-    print(f"- Students with any missing values: {missing_rows_count} ({missing_rows_percentage})")
-    print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} students")
-    print(f"- Counts rounded to nearest {ROUND_BASE}")
-    print()
+    emit(f"- Students with any missing values: {missing_rows_count} ({missing_rows_percentage})")
+    emit(f"- Suppression threshold: {SUPPRESS_THRESHOLD} students")
+    emit(f"- Counts rounded to nearest {ROUND_BASE}")
+    emit()
 
-    print()
+    emit()
     heading(base_level + 1, "Missing Data")
-    print()
-    print("| Field | Missing values (rounded) | % of students |")
-    print("| --- | --- | --- |")
+    emit()
+    emit("| Field | Missing values (rounded) | % of students |")
+    emit("| --- | --- | --- |")
     for field, missing, percentage in summarise_missing_data(rows, fieldnames):
-        print(f"| {field} | {missing} | {percentage} |")
-    print()
+        emit(f"| {field} | {missing} | {percentage} |")
+    emit()
 
     if include_school_counts:
         heading(base_level + 1, "Student Counts by School")
-        print()
+        emit()
         if SCHOOL_FIELD not in fieldnames:
             raise ValueError("students.csv must include a school_id column for per-school reporting.")
-        print("| School | Students (rounded) |")
-        print("| --- | --- |")
+        emit("| School | Students (rounded) |")
+        emit("| --- | --- |")
         school_counter = Counter(row[SCHOOL_FIELD] for row in rows)
         for school, count in summarise_counter(school_counter):
-            print(f"| {school} | {count} |")
-        print()
+            emit(f"| {school} | {count} |")
+        emit()
 
     heading(base_level + 1, "Student Counts by Sex")
-    print()
-    print("| Sex | Students (rounded) |")
-    print("| --- | --- |")
+    emit()
+    emit("| Sex | Students (rounded) |")
+    emit("| --- | --- |")
     sex_counter = Counter(row["sex"] for row in rows)
     for sex, count in summarise_counter(sex_counter):
-        print(f"| {sex} | {count} |")
-    print()
+        emit(f"| {sex} | {count} |")
+    emit()
 
     heading(base_level + 1, "Support And Funding Indicators")
-    print()
-    print("| Field | Yes (rounded) | No (rounded) | Other (rounded) |")
-    print("| --- | --- | --- | --- |")
+    emit()
+    emit("| Field | Yes (rounded) | No (rounded) | Other (rounded) |")
+    emit("| --- | --- | --- | --- |")
     for field in ("pp", "eal", "send", "ehcp", "lac"):
         yes, no, other = summarise_boolean_field(rows, field)
-        print(f"| {field} | {yes} | {no} | {other} |")
-    print()
+        emit(f"| {field} | {yes} | {no} | {other} |")
+    emit()
 
     heading(base_level + 1, "Key Stage 2 Score Summary")
-    print()
+    emit()
     for field in ["ks2_maths_score", "ks2_reading_score"]:
         heading(base_level + 2, field)
         for label, value in summarise_scores(rows, field):
-            print(f"- {label}: {value}")
-        print()
+            emit(f"- {label}: {value}")
+        emit()
 
 
 def write_teacher_section(rows, fieldnames, base_level=2):
     heading(base_level, "Teachers")
-    print()
+    emit()
 
     total_teachers = len(rows)
     missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
     missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_teachers)
 
     heading(base_level + 1, "Dataset Summary")
-    print()
-    print(f"- Total teachers: {safe_count(total_teachers)}")
+    emit()
+    emit(f"- Total teachers: {safe_count(total_teachers)}")
 
-    print(f"- Teachers with any missing values: {missing_rows_count} ({missing_rows_percentage})")
-    print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} teachers")
-    print(f"- Counts rounded to nearest {ROUND_BASE}")
-    print()
+    emit(f"- Teachers with any missing values: {missing_rows_count} ({missing_rows_percentage})")
+    emit(f"- Suppression threshold: {SUPPRESS_THRESHOLD} teachers")
+    emit(f"- Counts rounded to nearest {ROUND_BASE}")
+    emit()
 
-    print()
+    emit()
     heading(base_level + 1, "Missing Data")
-    print()
-    print("| Field | Missing values (rounded) | % of teachers |")
-    print("| --- | --- | --- |")
+    emit()
+    emit("| Field | Missing values (rounded) | % of teachers |")
+    emit("| --- | --- | --- |")
     for field, missing, percentage in summarise_missing_data(rows, fieldnames):
-        print(f"| {field} | {missing} | {percentage} |")
-    print()
+        emit(f"| {field} | {missing} | {percentage} |")
+    emit()
 
     heading(base_level + 1, "Teacher Counts by Payscale")
-    print()
-    print("| Payscale | Teachers (rounded) |")
-    print("| --- | --- |")
+    emit()
+    emit("| Payscale | Teachers (rounded) |")
+    emit("| --- | --- |")
     payscale_counter = Counter(row["payscale"] for row in rows)
     for payscale, count in summarise_counter(payscale_counter):
-        print(f"| {payscale} | {count} |")
-    print()
+        emit(f"| {payscale} | {count} |")
+    emit()
 
 
 def write_results_section(rows, fieldnames, base_level=2):
     heading(base_level, "Results")
-    print()
+    emit()
 
     total_records = len(rows)
 
@@ -207,42 +231,42 @@ def write_results_section(rows, fieldnames, base_level=2):
     missing_count_display, missing_percentage_display = format_count_and_percentage(missing_rows, total_records)
 
     heading(base_level + 1, "Dataset Summary")
-    print()
-    print(f"- Total records: {safe_count(total_records)}")
-    print(f"- Students represented: {safe_count(len(student_ids))}")
-    print(f"- Teachers represented: {safe_count(len(teacher_ids))}")
-    print(f"- Classes represented: {safe_count(len(class_ids))}")
-    print(f"- Earliest assessment date: {earliest_date}")
-    print(f"- Latest assessment date: {latest_date}")
-    print(f"- Records with any missing values: {missing_count_display} ({missing_percentage_display})")
-    print(f"- Suppression threshold: {SUPPRESS_THRESHOLD} records")
-    print(f"- Counts rounded to nearest {ROUND_BASE}")
-    print()
+    emit()
+    emit(f"- Total records: {safe_count(total_records)}")
+    emit(f"- Students represented: {safe_count(len(student_ids))}")
+    emit(f"- Teachers represented: {safe_count(len(teacher_ids))}")
+    emit(f"- Classes represented: {safe_count(len(class_ids))}")
+    emit(f"- Earliest assessment date: {earliest_date}")
+    emit(f"- Latest assessment date: {latest_date}")
+    emit(f"- Records with any missing values: {missing_count_display} ({missing_percentage_display})")
+    emit(f"- Suppression threshold: {SUPPRESS_THRESHOLD} records")
+    emit(f"- Counts rounded to nearest {ROUND_BASE}")
+    emit()
 
     heading(base_level + 1, "Missing Data")
-    print()
-    print("| Field | Missing values (rounded) | % of records |")
-    print("| --- | --- | --- |")
+    emit()
+    emit("| Field | Missing values (rounded) | % of records |")
+    emit("| --- | --- | --- |")
     for field, missing, percentage in summarise_missing_data(rows, fieldnames):
-        print(f"| {field} | {missing} | {percentage} |")
-    print()
+        emit(f"| {field} | {missing} | {percentage} |")
+    emit()
 
     heading(base_level + 1, "Academic Years")
-    print()
-    print("| academic_year | Records (rounded) |")
-    print("| --- | --- |")
+    emit()
+    emit("| academic_year | Records (rounded) |")
+    emit("| --- | --- |")
     academic_year_counter = Counter(row["academic_year"] for row in rows)
     for academic_year, count in summarise_counter(academic_year_counter):
-        print(f"| {academic_year} | {count} |")
+        emit(f"| {academic_year} | {count} |")
 
     heading(base_level + 1, "Year Groups")
-    print()
-    print("| year_group | Records (rounded) |")
-    print("| --- | --- |")
+    emit()
+    emit("| year_group | Records (rounded) |")
+    emit("| --- | --- |")
     year_group_counter = Counter(row["year_group"] for row in rows)
     for year_group, count in sorted(year_group_counter.items(), key=lambda item: year_group_sort_key(item[0])):
-        print(f"| {year_group} | {safe_count(count)} |")
-    print()
+        emit(f"| {year_group} | {safe_count(count)} |")
+    emit()
 
     write_scores_summary(rows, base_level=base_level + 1)
 
@@ -316,10 +340,10 @@ def summarise_boolean_field(rows, field):
 
 def write_scores_summary(rows, base_level=3):
     heading(base_level, "Scores")
-    print()
+    emit()
 
-    print("| Assessment type | Score type | Records (rounded) | No class (rounded) | No teacher (rounded) | Year groups (rounded) | Subjects (rounded) |")
-    print("| --- | --- | --- | --- | --- | --- | --- |")
+    emit("| Assessment type | Score type | Records (rounded) | No class (rounded) | No teacher (rounded) | Year groups (rounded) | Subjects (rounded) |")
+    emit("| --- | --- | --- | --- | --- | --- | --- |")
 
     grouped_rows = defaultdict(list)
     for row in rows:
@@ -333,10 +357,10 @@ def write_scores_summary(rows, base_level=3):
         no_teacher = sum(1 for row in rows if not row["teacher_id"])
         year_groups = summarise_year_groups(rows)
         subjects = summarise_subjects(rows)
-        print(
+        emit(
             f"| {assessment_type} | {score_type} | {record_count} | {safe_count(no_class)} | {safe_count(no_teacher)} | {year_groups} | {subjects} |"
         )
-    print()
+    emit()
 
 
 def classify_score_type(rows):
