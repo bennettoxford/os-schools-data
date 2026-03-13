@@ -3,7 +3,9 @@ import csv
 import math
 import re
 import sys
+from array import array
 from collections import Counter, defaultdict
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from statistics import mean, median, stdev
@@ -21,6 +23,50 @@ BTEC_GRADES = set("DMP")
 PLUS_MINUS_SCORES = {"--", "-", "=", "+", "++"}
 WORSE_SAME_BETTER = {"Worse", "Same", "Better"}
 OUTPUT_STREAM = sys.stdout
+
+
+@dataclass
+class StudentSummary:
+    total_rows: int = 0
+    missing_rows: int = 0
+    missing_by_field: dict[str, int] = field(default_factory=dict)
+    school_counter: Counter = field(default_factory=Counter)
+    sex_counter: Counter = field(default_factory=Counter)
+    boolean_counters: dict[str, Counter] = field(default_factory=dict)
+    score_values: dict[str, array] = field(default_factory=dict)
+
+
+@dataclass
+class TeacherSummary:
+    total_rows: int = 0
+    missing_rows: int = 0
+    missing_by_field: dict[str, int] = field(default_factory=dict)
+    payscale_counter: Counter = field(default_factory=Counter)
+
+
+@dataclass
+class ScoreGroupSummary:
+    record_count: int = 0
+    no_class: int = 0
+    no_teacher: int = 0
+    year_group_counter: Counter = field(default_factory=Counter)
+    subject_counter: Counter = field(default_factory=Counter)
+    scores: set[str] = field(default_factory=set)
+
+
+@dataclass
+class ResultsSummary:
+    total_rows: int = 0
+    missing_rows: int = 0
+    missing_by_field: dict[str, int] = field(default_factory=dict)
+    student_ids: set[str] = field(default_factory=set)
+    teacher_ids: set[str] = field(default_factory=set)
+    class_ids: set[str] = field(default_factory=set)
+    earliest_date: str | None = None
+    latest_date: str | None = None
+    academic_year_counter: Counter = field(default_factory=Counter)
+    year_group_counter: Counter = field(default_factory=Counter)
+    assessment_groups: dict[str, ScoreGroupSummary] = field(default_factory=dict)
 
 
 def parse_args(argv=None):
@@ -57,36 +103,37 @@ def emit(*args, **kwargs):
 
 
 def run_report(input_dir, title):
+    students_path = input_dir / "students.csv"
+    teachers_path = input_dir / "teachers.csv"
+    results_path = input_dir / "results.csv"
+
+    student_fieldnames = get_csv_fieldnames(students_path)
+    teacher_fieldnames = get_csv_fieldnames(teachers_path)
+    results_fieldnames = get_csv_fieldnames(results_path)
+
+    if SCHOOL_FIELD not in student_fieldnames:
+        raise ValueError("students.csv must include a school_id column for per-school reporting.")
+    if SCHOOL_FIELD not in teacher_fieldnames:
+        raise ValueError("teachers.csv must include a school_id column for per-school reporting.")
+    if SCHOOL_FIELD not in results_fieldnames:
+        raise ValueError("results.csv must include a school_id column for per-school reporting.")
+
+    student_summary, student_school_summaries = build_student_summaries(students_path, student_fieldnames)
+    teacher_summary, teacher_school_summaries = build_teacher_summaries(teachers_path, teacher_fieldnames)
+    results_summary, results_school_summaries = build_results_summaries(results_path, results_fieldnames)
 
     emit(f"# TED Data Report: {title}")
     emit()
     emit(f"Generated on {date.today()}.")
     emit()
 
-    students_rows, students_fieldnames = load_csv(input_dir / "students.csv")
-    teachers_rows, teachers_fieldnames = load_csv(input_dir / "teachers.csv")
-    results_rows, results_fieldnames = load_csv(input_dir / "results.csv")
-
-    write_student_section(students_rows, students_fieldnames, base_level=2, include_school_counts=True)
+    write_student_section(student_summary, student_fieldnames, base_level=2, include_school_counts=True)
     emit()
-    write_teacher_section(teachers_rows, teachers_fieldnames, base_level=2)
+    write_teacher_section(teacher_summary, teacher_fieldnames, base_level=2)
     emit()
-    write_results_section(results_rows, results_fieldnames, base_level=2)
+    write_results_section(results_summary, results_fieldnames, base_level=2)
 
-    student_school_field = SCHOOL_FIELD
-    teacher_school_field = SCHOOL_FIELD
-    results_school_field = SCHOOL_FIELD
-    if student_school_field not in students_fieldnames:
-        raise ValueError("students.csv must include a school_id column for per-school reporting.")
-    if teacher_school_field not in teachers_fieldnames:
-        raise ValueError("teachers.csv must include a school_id column for per-school reporting.")
-    if results_school_field not in results_fieldnames:
-        raise ValueError("results.csv must include a school_id column for per-school reporting.")
-
-    schools = []
-    if student_school_field:
-        schools = sorted({row[student_school_field] for row in students_rows if row.get(student_school_field)})
-
+    schools = sorted(school for school in student_school_summaries if school)
     if not schools:
         return
 
@@ -96,33 +143,89 @@ def run_report(input_dir, title):
         emit()
         heading(2, f"School: {school}")
         emit()
-        if student_school_field:
-            school_students = [row for row in students_rows if row.get(student_school_field) == school]
-            write_student_section(school_students, students_fieldnames, base_level=3, include_school_counts=False)
-            emit()
-        school_teachers = [row for row in teachers_rows if row.get(teacher_school_field) == school]
-        write_teacher_section(school_teachers, teachers_fieldnames, base_level=3)
+        write_student_section(student_school_summaries[school], student_fieldnames, base_level=3, include_school_counts=False)
         emit()
-        school_results = [row for row in results_rows if row.get(results_school_field) == school]
-        write_results_section(school_results, results_fieldnames, base_level=3)
+        write_teacher_section(teacher_school_summaries.get(school, new_teacher_summary(teacher_fieldnames)), teacher_fieldnames, base_level=3)
+        emit()
+        write_results_section(results_school_summaries.get(school, new_results_summary(results_fieldnames)), results_fieldnames, base_level=3)
 
 
 def heading(level, text):
     emit(f"{'#' * level} {text}")
 
 
-def write_student_section(rows, fieldnames, base_level=2, include_school_counts=True):
+def get_csv_fieldnames(path):
+    with path.open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        return list(reader.fieldnames or [])
+
+
+def iter_csv_rows(path, fieldnames):
+    with path.open(newline="") as handle:
+        reader = csv.DictReader(handle, fieldnames=fieldnames)
+        next(reader, None)
+        yield from reader
+
+
+def new_student_summary(fieldnames):
+    return StudentSummary(
+        missing_by_field={field: 0 for field in fieldnames},
+        boolean_counters={field: Counter() for field in ("pp", "eal", "send", "ehcp", "lac")},
+        score_values={field: array("d") for field in ("ks2_maths_score", "ks2_reading_score")},
+    )
+
+
+def build_student_summaries(path, fieldnames):
+    overall = new_student_summary(fieldnames)
+    by_school = {}
+    for row in iter_csv_rows(path, fieldnames):
+        update_student_summary(overall, row, fieldnames)
+        school = intern_if_present(row.get(SCHOOL_FIELD, ""))
+        if school:
+            school_summary = by_school.get(school)
+            if school_summary is None:
+                school_summary = new_student_summary(fieldnames)
+                by_school[school] = school_summary
+            update_student_summary(school_summary, row, fieldnames)
+    return overall, by_school
+
+
+def update_student_summary(summary, row, fieldnames):
+    summary.total_rows += 1
+    row_has_missing = False
+    for field in fieldnames:
+        value = row.get(field, "")
+        if not value:
+            summary.missing_by_field[field] += 1
+            row_has_missing = True
+    if row_has_missing:
+        summary.missing_rows += 1
+
+    school = intern_if_present(row.get(SCHOOL_FIELD, ""))
+    if school:
+        summary.school_counter[school] += 1
+
+    summary.sex_counter[intern_if_present(row.get("sex", ""))] += 1
+
+    for field in ("pp", "eal", "send", "ehcp", "lac"):
+        summary.boolean_counters[field][intern_if_present(normalise_string(row.get(field, "")))] += 1
+
+    for field in ("ks2_maths_score", "ks2_reading_score"):
+        value = row.get(field, "")
+        if value:
+            summary.score_values[field].append(float(value))
+
+
+def write_student_section(summary, fieldnames, base_level=2, include_school_counts=True):
     heading(base_level, "Students")
     emit()
 
-    total_students = len(rows)
-    missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
-    missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_students)
+    total_students = summary.total_rows
+    missing_rows_count, missing_rows_percentage = format_count_and_percentage(summary.missing_rows, total_students)
 
     heading(base_level + 1, "Dataset Summary")
     emit()
     emit(f"- Total students: {safe_count(total_students)}")
-
     emit(f"- Students with any missing values: {missing_rows_count} ({missing_rows_percentage})")
     emit(f"- Suppression threshold: {SUPPRESS_THRESHOLD} students")
     emit(f"- Counts rounded to nearest {ROUND_BASE}")
@@ -133,19 +236,16 @@ def write_student_section(rows, fieldnames, base_level=2, include_school_counts=
     emit()
     emit("| Field | Missing values (rounded) | % of students |")
     emit("| --- | --- | --- |")
-    for field, missing, percentage in summarise_missing_data(rows, fieldnames):
+    for field, missing, percentage in summarise_missing_data(summary.missing_by_field, fieldnames, total_students):
         emit(f"| {field} | {missing} | {percentage} |")
     emit()
 
     if include_school_counts:
         heading(base_level + 1, "Student Counts by School")
         emit()
-        if SCHOOL_FIELD not in fieldnames:
-            raise ValueError("students.csv must include a school_id column for per-school reporting.")
         emit("| School | Students (rounded) |")
         emit("| --- | --- |")
-        school_counter = Counter(row[SCHOOL_FIELD] for row in rows)
-        for school, count in summarise_counter(school_counter):
+        for school, count in summarise_counter(summary.school_counter):
             emit(f"| {school} | {count} |")
         emit()
 
@@ -153,8 +253,7 @@ def write_student_section(rows, fieldnames, base_level=2, include_school_counts=
     emit()
     emit("| Sex | Students (rounded) |")
     emit("| --- | --- |")
-    sex_counter = Counter(row["sex"] for row in rows)
-    for sex, count in summarise_counter(sex_counter):
+    for sex, count in summarise_counter(summary.sex_counter):
         emit(f"| {sex} | {count} |")
     emit()
 
@@ -163,31 +262,61 @@ def write_student_section(rows, fieldnames, base_level=2, include_school_counts=
     emit("| Field | Yes (rounded) | No (rounded) | Other (rounded) |")
     emit("| --- | --- | --- | --- |")
     for field in ("pp", "eal", "send", "ehcp", "lac"):
-        yes, no, other = summarise_boolean_field(rows, field)
+        yes, no, other = summarise_boolean_counter(summary.boolean_counters[field], total_students)
         emit(f"| {field} | {yes} | {no} | {other} |")
     emit()
 
     heading(base_level + 1, "Key Stage 2 Score Summary")
     emit()
-    for field in ["ks2_maths_score", "ks2_reading_score"]:
+    for field in ("ks2_maths_score", "ks2_reading_score"):
         heading(base_level + 2, field)
-        for label, value in summarise_scores(rows, field):
+        for label, value in summarise_scores(summary.score_values[field]):
             emit(f"- {label}: {value}")
         emit()
 
 
-def write_teacher_section(rows, fieldnames, base_level=2):
+def new_teacher_summary(fieldnames):
+    return TeacherSummary(missing_by_field={field: 0 for field in fieldnames})
+
+
+def build_teacher_summaries(path, fieldnames):
+    overall = new_teacher_summary(fieldnames)
+    by_school = {}
+    for row in iter_csv_rows(path, fieldnames):
+        update_teacher_summary(overall, row, fieldnames)
+        school = intern_if_present(row.get(SCHOOL_FIELD, ""))
+        if school:
+            school_summary = by_school.get(school)
+            if school_summary is None:
+                school_summary = new_teacher_summary(fieldnames)
+                by_school[school] = school_summary
+            update_teacher_summary(school_summary, row, fieldnames)
+    return overall, by_school
+
+
+def update_teacher_summary(summary, row, fieldnames):
+    summary.total_rows += 1
+    row_has_missing = False
+    for field in fieldnames:
+        value = row.get(field, "")
+        if not value:
+            summary.missing_by_field[field] += 1
+            row_has_missing = True
+    if row_has_missing:
+        summary.missing_rows += 1
+    summary.payscale_counter[intern_if_present(row.get("payscale", ""))] += 1
+
+
+def write_teacher_section(summary, fieldnames, base_level=2):
     heading(base_level, "Teachers")
     emit()
 
-    total_teachers = len(rows)
-    missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
-    missing_rows_count, missing_rows_percentage = format_count_and_percentage(missing_rows, total_teachers)
+    total_teachers = summary.total_rows
+    missing_rows_count, missing_rows_percentage = format_count_and_percentage(summary.missing_rows, total_teachers)
 
     heading(base_level + 1, "Dataset Summary")
     emit()
     emit(f"- Total teachers: {safe_count(total_teachers)}")
-
     emit(f"- Teachers with any missing values: {missing_rows_count} ({missing_rows_percentage})")
     emit(f"- Suppression threshold: {SUPPRESS_THRESHOLD} teachers")
     emit(f"- Counts rounded to nearest {ROUND_BASE}")
@@ -198,7 +327,7 @@ def write_teacher_section(rows, fieldnames, base_level=2):
     emit()
     emit("| Field | Missing values (rounded) | % of teachers |")
     emit("| --- | --- | --- |")
-    for field, missing, percentage in summarise_missing_data(rows, fieldnames):
+    for field, missing, percentage in summarise_missing_data(summary.missing_by_field, fieldnames, total_teachers):
         emit(f"| {field} | {missing} | {percentage} |")
     emit()
 
@@ -206,38 +335,102 @@ def write_teacher_section(rows, fieldnames, base_level=2):
     emit()
     emit("| Payscale | Teachers (rounded) |")
     emit("| --- | --- |")
-    payscale_counter = Counter(row["payscale"] for row in rows)
-    for payscale, count in summarise_counter(payscale_counter):
+    for payscale, count in summarise_counter(summary.payscale_counter):
         emit(f"| {payscale} | {count} |")
     emit()
 
 
-def write_results_section(rows, fieldnames, base_level=2):
+def new_score_group_summary():
+    return ScoreGroupSummary()
+
+
+def new_results_summary(fieldnames):
+    return ResultsSummary(
+        missing_by_field={field: 0 for field in fieldnames},
+        assessment_groups=defaultdict(new_score_group_summary),
+    )
+
+
+def build_results_summaries(path, fieldnames):
+    overall = new_results_summary(fieldnames)
+    by_school = {}
+    for row in iter_csv_rows(path, fieldnames):
+        update_results_summary(overall, row, fieldnames)
+        school = intern_if_present(row.get(SCHOOL_FIELD, ""))
+        if school:
+            school_summary = by_school.get(school)
+            if school_summary is None:
+                school_summary = new_results_summary(fieldnames)
+                by_school[school] = school_summary
+            update_results_summary(school_summary, row, fieldnames)
+    return overall, by_school
+
+
+def update_results_summary(summary, row, fieldnames):
+    summary.total_rows += 1
+
+    row_has_missing = False
+    for field in fieldnames:
+        value = row.get(field, "")
+        if not value:
+            summary.missing_by_field[field] += 1
+            row_has_missing = True
+    if row_has_missing:
+        summary.missing_rows += 1
+
+    student_id = intern_if_present(row.get("student_id", ""))
+    teacher_id = intern_if_present(row.get("teacher_id", ""))
+    class_id = intern_if_present(row.get("class_id", ""))
+    date_value = row.get("date", "")
+    academic_year = intern_if_present(row.get("academic_year", ""))
+    year_group = intern_if_present(row.get("year_group", ""))
+    assessment_type = intern_if_present(row.get("assessment_type", ""))
+    subject = intern_if_present(row.get("subject", ""))
+    score = intern_if_present(row.get("score", ""))
+
+    if student_id:
+        summary.student_ids.add(student_id)
+    if teacher_id:
+        summary.teacher_ids.add(teacher_id)
+    if class_id:
+        summary.class_ids.add(class_id)
+
+    if date_value:
+        if summary.earliest_date is None or date_value < summary.earliest_date:
+            summary.earliest_date = date_value
+        if summary.latest_date is None or date_value > summary.latest_date:
+            summary.latest_date = date_value
+
+    summary.academic_year_counter[academic_year] += 1
+    summary.year_group_counter[year_group] += 1
+
+    group = summary.assessment_groups[assessment_type]
+    group.record_count += 1
+    if not class_id:
+        group.no_class += 1
+    if not teacher_id:
+        group.no_teacher += 1
+    group.year_group_counter[year_group] += 1
+    group.subject_counter[subject] += 1
+    if score:
+        group.scores.add(score)
+
+
+def write_results_section(summary, fieldnames, base_level=2):
     heading(base_level, "Results")
     emit()
 
-    total_records = len(rows)
-
-    student_ids = {row["student_id"] for row in rows}
-    teacher_ids = {row["teacher_id"] for row in rows if "teacher_id" in row}
-    class_ids = {row["class_id"] for row in rows if "class_id" in row}
-
-    date_values = [row["date"] for row in rows]
-    date_values.sort()
-    earliest_date = date_values[0] if date_values else None
-    latest_date = date_values[-1] if date_values else None
-
-    missing_rows = sum(1 for row in rows if any(not row[field] for field in fieldnames))
-    missing_count_display, missing_percentage_display = format_count_and_percentage(missing_rows, total_records)
+    total_records = summary.total_rows
+    missing_count_display, missing_percentage_display = format_count_and_percentage(summary.missing_rows, total_records)
 
     heading(base_level + 1, "Dataset Summary")
     emit()
     emit(f"- Total records: {safe_count(total_records)}")
-    emit(f"- Students represented: {safe_count(len(student_ids))}")
-    emit(f"- Teachers represented: {safe_count(len(teacher_ids))}")
-    emit(f"- Classes represented: {safe_count(len(class_ids))}")
-    emit(f"- Earliest assessment date: {earliest_date}")
-    emit(f"- Latest assessment date: {latest_date}")
+    emit(f"- Students represented: {safe_count(len(summary.student_ids))}")
+    emit(f"- Teachers represented: {safe_count(len(summary.teacher_ids))}")
+    emit(f"- Classes represented: {safe_count(len(summary.class_ids))}")
+    emit(f"- Earliest assessment date: {summary.earliest_date}")
+    emit(f"- Latest assessment date: {summary.latest_date}")
     emit(f"- Records with any missing values: {missing_count_display} ({missing_percentage_display})")
     emit(f"- Suppression threshold: {SUPPRESS_THRESHOLD} records")
     emit(f"- Counts rounded to nearest {ROUND_BASE}")
@@ -247,7 +440,7 @@ def write_results_section(rows, fieldnames, base_level=2):
     emit()
     emit("| Field | Missing values (rounded) | % of records |")
     emit("| --- | --- | --- |")
-    for field, missing, percentage in summarise_missing_data(rows, fieldnames):
+    for field, missing, percentage in summarise_missing_data(summary.missing_by_field, fieldnames, total_records):
         emit(f"| {field} | {missing} | {percentage} |")
     emit()
 
@@ -255,34 +448,30 @@ def write_results_section(rows, fieldnames, base_level=2):
     emit()
     emit("| academic_year | Records (rounded) |")
     emit("| --- | --- |")
-    academic_year_counter = Counter(row["academic_year"] for row in rows)
-    for academic_year, count in summarise_counter(academic_year_counter):
+    for academic_year, count in summarise_counter(summary.academic_year_counter):
         emit(f"| {academic_year} | {count} |")
 
     heading(base_level + 1, "Year Groups")
     emit()
     emit("| year_group | Records (rounded) |")
     emit("| --- | --- |")
-    year_group_counter = Counter(row["year_group"] for row in rows)
-    for year_group, count in sorted(year_group_counter.items(), key=lambda item: year_group_sort_key(item[0])):
+    for year_group, count in sorted(summary.year_group_counter.items(), key=lambda item: year_group_sort_key(item[0])):
         emit(f"| {year_group} | {safe_count(count)} |")
     emit()
 
-    write_scores_summary(rows, base_level=base_level + 1)
+    write_scores_summary(summary.assessment_groups, base_level=base_level + 1)
 
 
-def summarise_missing_data(rows, fieldnames):
-    total_rows = len(rows)
+def summarise_missing_data(missing_by_field, fieldnames, total_rows):
     summaries = []
     for field in fieldnames:
-        missing = sum(1 for row in rows if not row[field])
+        missing = missing_by_field[field]
         count_display, percentage_display = format_count_and_percentage(missing, total_rows)
         summaries.append((field, count_display, percentage_display))
     return summaries
 
 
-def summarise_scores(rows, field):
-    scores = parse_scores(rows, field)
+def summarise_scores(scores):
     if not scores:
         return [("Count", "0")]
 
@@ -291,7 +480,7 @@ def summarise_scores(rows, field):
 
     metrics.append(("Count", safe_count(len(scores))))
     metrics.append(("Mean", format_float(mean(scores))))
-    metrics.append(("Median", format_float(median(scores))))
+    metrics.append(("Median", format_float(median(sorted_scores))))
 
     if len(scores) >= 2:
         metrics.append(("Standard deviation", format_float(stdev(scores))))
@@ -326,10 +515,10 @@ def percentile(sorted_values, fraction):
     return lower_value * (1 - weight) + upper_value * weight
 
 
-def summarise_boolean_field(rows, field):
-    truthy = sum(1 for row in rows if row[field].upper() == "T")
-    falsy = sum(1 for row in rows if row[field].upper() == "F")
-    other = len(rows) - truthy - falsy
+def summarise_boolean_counter(counter, total_rows):
+    truthy = counter.get("T", 0)
+    falsy = counter.get("F", 0)
+    other = total_rows - truthy - falsy
 
     yes_display = safe_count(truthy)
     no_display = safe_count(falsy)
@@ -338,36 +527,31 @@ def summarise_boolean_field(rows, field):
     return yes_display, no_display, "0"
 
 
-def write_scores_summary(rows, base_level=3):
+def write_scores_summary(assessment_groups, base_level=3):
     heading(base_level, "Scores")
     emit()
 
     emit("| Assessment type | Score type | Records (rounded) | No class (rounded) | No teacher (rounded) | Year groups (rounded) | Subjects (rounded) |")
     emit("| --- | --- | --- | --- | --- | --- | --- |")
 
-    grouped_rows = defaultdict(list)
-    for row in rows:
-        grouped_rows[row["assessment_type"]].append(row)
-
-    for assessment_type in sorted(grouped_rows):
-        rows = grouped_rows[assessment_type]
-        score_type = classify_score_type(rows)
-        record_count = safe_count(len(rows))
-        no_class = sum(1 for row in rows if not row["class_id"])
-        no_teacher = sum(1 for row in rows if not row["teacher_id"])
-        year_groups = summarise_year_groups(rows)
-        subjects = summarise_subjects(rows)
-        emit(
-            f"| {assessment_type} | {score_type} | {record_count} | {safe_count(no_class)} | {safe_count(no_teacher)} | {year_groups} | {subjects} |"
-        )
+    for assessment_type in sorted(assessment_groups):
+        group = assessment_groups[assessment_type]
+        score_type = classify_score_type(group.scores)
+        record_count = safe_count(group.record_count)
+        no_class = safe_count(group.no_class)
+        no_teacher = safe_count(group.no_teacher)
+        year_groups = summarise_year_groups(group.year_group_counter)
+        subjects = summarise_subjects(group.subject_counter)
+        emit(f"| {assessment_type} | {score_type} | {record_count} | {no_class} | {no_teacher} | {year_groups} | {subjects} |")
     emit()
 
 
-def classify_score_type(rows):
-    scores = {row["score"] for row in rows}
+def classify_score_type(scores):
+    if not scores:
+        return "Unknown grading system"
 
     if len(scores) == 1:
-        return f"All scores the same: {list(scores)[0]}"
+        return f"All scores the same: {next(iter(scores))}"
 
     if all(re.fullmatch(r"\d[ABCDE]\+?", score) for score in scores):
         return f"Eg 8A+ (min: {min(scores)}, max: {max(scores)})"
@@ -407,8 +591,7 @@ def classify_score_type(rows):
         return "Unknown grading system"
 
 
-def summarise_year_groups(rows):
-    counter = Counter(row["year_group"] for row in rows)
+def summarise_year_groups(counter):
     items = []
     for year_group, count in sorted(counter.items(), key=lambda item: (year_group_sort_key(item[0]), item[0])):
         items.append(f"{year_group} ({format_detail_count(count)})")
@@ -419,21 +602,30 @@ def year_group_sort_key(year_group):
     if year_group == "R":
         return 0
     match = re.search(r"\d+", year_group)
-    return int(match.group())
+    return int(match.group()) if match else float("inf")
 
 
-def summarise_subjects(rows):
-    counter = Counter(row["subject"] for row in rows)
+def summarise_subjects(counter):
     items = []
     for subject, count in sorted(counter.items()):
         items.append(f"{subject} ({format_detail_count(count)})")
     return "; ".join(items) if items else "-"
 
 
+def normalise_string(value):
+    return value.strip().upper()
+
+
+def intern_if_present(value):
+    if value:
+        return sys.intern(value)
+    return ""
+
+
 def safe_count(count):
     if count == 0:
         return "0"
-    elif count < SUPPRESS_THRESHOLD:
+    if count < SUPPRESS_THRESHOLD:
         return f"<{SUPPRESS_THRESHOLD} (suppressed)"
     return str(round_count(count))
 
@@ -462,10 +654,6 @@ def summarise_counter(counter):
     return [(key, safe_count(count)) for key, count in sorted(counter.items())]
 
 
-def parse_scores(rows, field):
-    return [float(row[field]) for row in rows if row[field]]
-
-
 def format_detail_count(count):
     if count > SUPPRESS_THRESHOLD:
         return str(round_count(count))
@@ -474,13 +662,6 @@ def format_detail_count(count):
 
 def round_count(count):
     return int(ROUND_BASE * round(count / ROUND_BASE))
-
-
-def load_csv(path):
-    with path.open() as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-    return rows, reader.fieldnames
 
 
 if __name__ == "__main__":
