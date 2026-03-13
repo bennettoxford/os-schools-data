@@ -35,7 +35,7 @@ actions:
     needs: [generate_students, generate_teachers, generate_results]
     run: python:v2 generate_report.py output/ "User Data Report" --output output/report.md
     outputs:
-      highly_sensitive:
+      moderately_sensitive:
         students: output/report.md
 
 
